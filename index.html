@@ -1,0 +1,118 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle do Kart</title>
+
+    <style>
+        body {
+            background: #181818;
+            color: white;
+            font-family: Arial;
+            text-align: center;
+            padding: 20px;
+        }
+
+        #steer {
+            font-size: 24px;
+            margin: 30px;
+        }
+
+        button {
+            width: 130px;
+            height: 100px;
+            border: none;
+            border-radius: 15px;
+            font-size: 22px;
+            font-weight: bold;
+            color: white;
+            margin: 10px;
+        }
+
+        #gas { background: #159447; }
+        #brake { background: #c83232; }
+    </style>
+</head>
+
+<body>
+
+    <h1>Controle do Kart</h1>
+
+    <p id="status">Conectando...</p>
+    <div id="steer">Volante: 0</div>
+
+    <button id="gas">ACELERAR</button>
+    <button id="brake">FREAR</button>
+
+    <script>
+        const socket = new WebSocket("ws://localhost:8080");
+
+        let steer = 0;
+        let gas = 0;
+        let brake = 0;
+
+        socket.onopen = () => {
+            document.getElementById("status").innerText = "Conectado!";
+        };
+
+        socket.onclose = () => {
+            document.getElementById("status").innerText = "Desconectado";
+        };
+
+        // Captura a inclinação do celular
+        window.addEventListener("deviceorientation", (event) => {
+            if (event.gamma !== null) {
+                steer = Math.max(-1, Math.min(1, event.gamma / 45));
+
+                document.getElementById("steer").innerText =
+                    "Volante: " + steer.toFixed(2);
+            }
+        });
+
+        // Acelerador
+        const gasButton = document.getElementById("gas");
+
+        gasButton.addEventListener("pointerdown", () => {
+            gas = 1;
+        });
+
+        gasButton.addEventListener("pointerup", () => {
+            gas = 0;
+        });
+
+        gasButton.addEventListener("pointerleave", () => {
+            gas = 0;
+        });
+
+        // Freio
+        const brakeButton = document.getElementById("brake");
+
+        brakeButton.addEventListener("pointerdown", () => {
+            brake = 1;
+        });
+
+        brakeButton.addEventListener("pointerup", () => {
+            brake = 0;
+        });
+
+        brakeButton.addEventListener("pointerleave", () => {
+            brake = 0;
+        });
+
+        // Envia os controles continuamente
+        setInterval(() => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    type: "input",
+                    steer: steer,
+                    gas: gas,
+                    brake: brake
+                }));
+            }
+        }, 33);
+    </script>
+
+</body>
+</html>
