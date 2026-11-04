@@ -119,7 +119,6 @@
     </div>
 
     <script>
-<<<<<<< HEAD
       // ===== SERVIDOR =====
       // Local:     http://192.168.x.x:8080  -> ws://192.168.x.x:8080
       // Hospedado: https://seu-app.com      -> wss://seu-app.com
@@ -127,9 +126,8 @@
       function urlDoServidor() {
         const parametro = new URLSearchParams(location.search).get('server');
         if (parametro) return parametro;
-=======
+        
         const socket = new WebSocket("ws://git-hub-controller.vercel.app/");
->>>>>>> c60b81fdc96dbfabfe52c605819f29a61b975ca0
 
         const protocolo = location.protocol === 'https:' ? 'wss://' : 'ws://';
         return protocolo + location.host;
