@@ -1,118 +1,264 @@
-
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
+    />
     <title>Controle do Kart</title>
-
     <style>
-        body {
-            background: #181818;
-            color: white;
-            font-family: Arial;
-            text-align: center;
-            padding: 20px;
-        }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
 
-        #steer {
-            font-size: 24px;
-            margin: 30px;
-        }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #111;
+        color: #fff;
+        font-family: system-ui, sans-serif;
+        touch-action: none;
+        overflow: hidden;
+      }
 
-        button {
-            width: 130px;
-            height: 100px;
-            border: none;
-            border-radius: 15px;
-            font-size: 22px;
-            font-weight: bold;
-            color: white;
-            margin: 10px;
-        }
+      body {
+        display: flex;
+        flex-direction: column;
+        padding: 12px;
+        gap: 12px;
+      }
 
-        #gas { background: #159447; }
-        #brake { background: #c83232; }
+      #topo {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        font-size: 16px;
+      }
+
+      #status.ok {
+        color: #4caf50;
+      }
+      #status.erro {
+        color: #ff5252;
+      }
+
+      #sensor {
+        padding: 10px 16px;
+        font-size: 16px;
+        border: 0;
+        border-radius: 8px;
+        background: #2196f3;
+        color: #fff;
+      }
+
+      #barra {
+        height: 14px;
+        background: #333;
+        border-radius: 7px;
+        position: relative;
+      }
+
+      #ponteiro {
+        position: absolute;
+        top: -3px;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        margin-left: -10px;
+        border-radius: 50%;
+        background: #ffc107;
+      }
+
+      #botoes {
+        flex: 1;
+        display: flex;
+        gap: 12px;
+      }
+
+      .botao {
+        flex: 1;
+        border: 0;
+        border-radius: 16px;
+        font-size: 28px;
+        font-weight: 700;
+        color: #fff;
+        touch-action: none;
+      }
+
+      #brake {
+        background: #c62828;
+      }
+      #gas {
+        background: #2e7d32;
+      }
+
+      .botao.ativo {
+        filter: brightness(1.5);
+      }
     </style>
-</head>
+  </head>
+  <body>
+    <div id="topo">
+      <span id="status" class="erro">Conectando...</span>
+      <span id="steer">Volante: 0.00</span>
+      <button id="sensor">Ativar sensor</button>
+    </div>
 
-<body>
+    <div id="barra"><div id="ponteiro"></div></div>
 
-    <h1>Controle do Kart</h1>
-
-    <p id="status">Conectando...</p>
-    <div id="steer">Volante: 0</div>
-
-    <button id="gas">ACELERAR</button>
-    <button id="brake">FREAR</button>
+    <div id="botoes">
+      <button id="brake" class="botao">FREIO</button>
+      <button id="gas" class="botao">ACELERAR</button>
+    </div>
 
     <script>
-        const socket = new WebSocket("ws://localhost:8080");
+      // ===== SERVIDOR =====
+      // Local:     http://192.168.x.x:8080  -> ws://192.168.x.x:8080
+      // Hospedado: https://seu-app.com      -> wss://seu-app.com
+      // Também dá pra forçar: controller.html?server=wss://outro-servidor.com
+      function urlDoServidor() {
+        const parametro = new URLSearchParams(location.search).get('server');
+        if (parametro) return parametro;
 
-        let steer = 0;
-        let gas = 0;
-        let brake = 0;
+        const protocolo = location.protocol === 'https:' ? 'wss://' : 'ws://';
+        return protocolo + location.host;
+      }
+
+      const statusEl = document.getElementById('status');
+      const steerEl = document.getElementById('steer');
+      const ponteiro = document.getElementById('ponteiro');
+      const barra = document.getElementById('barra');
+      const sensorBtn = document.getElementById('sensor');
+
+      let socket = null;
+
+      let steer = 0;
+      let gas = 0;
+      let brake = 0;
+
+      function mostrarStatus(texto, ok) {
+        statusEl.innerText = texto;
+        statusEl.className = ok ? 'ok' : 'erro';
+      }
+
+      function conectar() {
+        socket = new WebSocket(urlDoServidor());
 
         socket.onopen = () => {
-            document.getElementById("status").innerText = "Conectado!";
+          mostrarStatus('Conectado!', true);
         };
 
         socket.onclose = () => {
-            document.getElementById("status").innerText = "Desconectado";
+          mostrarStatus('Desconectado, tentando de novo...', false);
+          setTimeout(conectar, 2000);
         };
 
-        // Captura a inclinação do celular
-        window.addEventListener("deviceorientation", (event) => {
-            if (event.gamma !== null) {
-                steer = Math.max(-1, Math.min(1, event.gamma / 45));
+        socket.onerror = () => {
+          socket.close();
+        };
+      }
 
-                document.getElementById("steer").innerText =
-                    "Volante: " + steer.toFixed(2);
+      conectar();
+
+      // ===== SENSOR DE INCLINAÇÃO =====
+      function aoInclinar(event) {
+        if (event.gamma === null) return;
+
+        steer = Math.max(-1, Math.min(1, event.gamma / 45));
+
+        steerEl.innerText = 'Volante: ' + steer.toFixed(2);
+
+        const largura = barra.clientWidth / 2 - 10;
+        ponteiro.style.transform = 'translateX(' + steer * largura + 'px)';
+      }
+
+      // No iPhone é obrigatório pedir permissão (e a página precisa ser HTTPS).
+      // No Android basta escutar o evento (também exige HTTPS).
+      async function ativarSensor() {
+        if (!window.isSecureContext) {
+          mostrarStatus(
+            'O sensor só funciona em HTTPS. Abra o link https://',
+            false,
+          );
+          return;
+        }
+
+        try {
+          if (
+            typeof DeviceOrientationEvent !== 'undefined' &&
+            typeof DeviceOrientationEvent.requestPermission === 'function'
+          ) {
+            const resposta = await DeviceOrientationEvent.requestPermission();
+
+            if (resposta !== 'granted') {
+              mostrarStatus('Permissão do sensor negada', false);
+              return;
             }
-        });
+          }
 
-        // Acelerador
-        const gasButton = document.getElementById("gas");
+          window.addEventListener('deviceorientation', aoInclinar);
+          sensorBtn.style.display = 'none';
 
-        gasButton.addEventListener("pointerdown", () => {
-            gas = 1;
-        });
+          // Impede a tela de apagar durante o jogo
+          if (navigator.wakeLock) {
+            navigator.wakeLock.request('screen').catch(() => {});
+          }
+        } catch (erro) {
+          mostrarStatus('Não foi possível ativar o sensor', false);
+        }
+      }
 
-        gasButton.addEventListener("pointerup", () => {
-            gas = 0;
-        });
+      sensorBtn.addEventListener('click', ativarSensor);
 
-        gasButton.addEventListener("pointerleave", () => {
-            gas = 0;
-        });
+      // ===== BOTÕES =====
+      function ligarBotao(id, aoMudar) {
+        const botao = document.getElementById(id);
 
-        // Freio
-        const brakeButton = document.getElementById("brake");
+        const apertar = (e) => {
+          e.preventDefault();
+          botao.classList.add('ativo');
+          aoMudar(1);
+        };
 
-        brakeButton.addEventListener("pointerdown", () => {
-            brake = 1;
-        });
+        const soltar = () => {
+          botao.classList.remove('ativo');
+          aoMudar(0);
+        };
 
-        brakeButton.addEventListener("pointerup", () => {
-            brake = 0;
-        });
+        botao.addEventListener('pointerdown', apertar);
+        botao.addEventListener('pointerup', soltar);
+        botao.addEventListener('pointerleave', soltar);
+        botao.addEventListener('pointercancel', soltar);
+        botao.addEventListener('contextmenu', (e) => e.preventDefault());
+      }
 
-        brakeButton.addEventListener("pointerleave", () => {
-            brake = 0;
-        });
+      ligarBotao('gas', (v) => {
+        gas = v;
+      });
+      ligarBotao('brake', (v) => {
+        brake = v;
+      });
 
-        // Envia os controles continuamente
-        setInterval(() => {
-            if (socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    type: "input",
-                    steer: steer,
-                    gas: gas,
-                    brake: brake
-                }));
-            }
-        }, 33);
+      // ===== ENVIO CONTÍNUO =====
+      setInterval(() => {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.send(
+            JSON.stringify({
+              type: 'input',
+              steer: steer,
+              gas: gas,
+              brake: brake,
+            }),
+          );
+        }
+      }, 33);
     </script>
-
-</body>
+  </body>
 </html>
