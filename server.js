@@ -17,7 +17,7 @@ const app = express();
 // ===== ROTAS HTTP =====
 // Página do controle (o celular abre este endereço)
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'controller.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Verificação de saúde (útil na hospedagem e pra testar no navegador)
