@@ -127,8 +127,6 @@
         const parametro = new URLSearchParams(location.search).get('server');
         if (parametro) return parametro;
 
-        const socket = new WebSocket('ws://git-hub-controller.vercel.app/');
-
         const protocolo = location.protocol === 'https:' ? 'wss://' : 'ws://';
         return protocolo + location.host;
       }
